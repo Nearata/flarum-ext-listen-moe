@@ -1,0 +1,46 @@
+{
+    "name": "nearata/flarum-ext-listen-moe",
+    "description": "LISTEN.moe radio.",
+    "keywords": [
+        "flarum",
+        "jpop",
+        "kpop"
+    ],
+    "type": "flarum-extension",
+    "license": "MIT",
+    "support": {
+        "issues": "https://github.com/Nearata/flarum-ext-listen-moe/issues",
+        "source": "https://github.com/Nearata/flarum-ext-listen-moe"
+    },
+    "require": {
+        "flarum/core": ">=0.1.0-beta.16 <=0.1.0"
+    },
+    "authors": [
+        {
+            "name": "Nearata",
+            "email": "williamdicicco@protonmail.com",
+            "role": "Developer"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "Nearata\\ListenMoe\\": "src/"
+        }
+    },
+    "extra": {
+        "flarum-extension": {
+            "title": "Listen Moe",
+            "category": "feature",
+            "icon": {
+                "image": "icon.png",
+                "backgroundColor": "#3F3047",
+                "backgroundSize": "60%",
+                "backgroundPosition": "center",
+                "backgroundRepeat": "no-repeat"
+            }
+        },
+        "flagrow": {
+            "discuss": ""
+        }
+    }
+}
