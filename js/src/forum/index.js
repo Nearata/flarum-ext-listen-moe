@@ -39,97 +39,106 @@ app.initializers.add('nearata-listen-moe', app => {
         return 'https://listen.moe/_nuxt/img/blank-dark.cd1c044.png';
     };
 
-    const wsPromise = (audioUrl, wsUrl) => new Promise(resolve => {
-        let heartbeatInterval;
-        let ws;
+    const wsPromise = (audioUrl, wsUrl) => {
+        return new Promise(resolve => {
+            const listenMoe = () => {
+                let heartbeatInterval;
+                let ws;
 
-        const heartbeat = interval => {
-            heartbeatInterval = setInterval(() => {
-                ws.send(JSON.stringify({ op: 9 }));
-            }, interval);
-        }
+                const heartbeat = interval => {
+                    heartbeatInterval = setInterval(() => {
+                        ws.send(JSON.stringify({ op: 9 }));
+                    }, interval);
+                }
 
-        ws = new WebSocket(wsUrl);
+                ws = new WebSocket(wsUrl);
 
-        ws.onopen = () => {
-            clearInterval(heartbeatInterval);
-            heartbeatInterval = null;
-        };
+                ws.onopen = () => {
+                    clearInterval(heartbeatInterval);
+                    heartbeatInterval = null;
+                };
 
-        ws.onmessage = message => {
-            if (!message.data.length) {
-                return;
-            }
-
-            let response;
-
-            try {
-                response = JSON.parse(message.data);
-            } catch (error) {
-                return;
-            }
-
-            switch (response.op) {
-                case 0:
-                    ws.send(JSON.stringify({ op: 9 }));
-                    heartbeat(response.d.heartbeat);
-                    break;
-                case 1:
-                    if (response.t !== 'TRACK_UPDATE' && response.t !== 'TRACK_UPDATE_REQUEST' && response.t !== 'QUEUE_UPDATE' && response.t !== 'NOTIFICATION') {
-                        break;
+                ws.onmessage = message => {
+                    if (!message.data.length) {
+                        return;
                     }
 
-                    const res = response.d;
+                    let response;
 
-                    const artists = res.song.artists.map(e => e.name).join(', ');
-                    const albums = res.song.albums;
-                    const cover = albums.length > 0 && albums[0].image !== null ? getCover(albums[0].image) : getBlankCover();
-                    const sources = res.song.sources.map(e => e.nameRomaji).join(', ');
+                    try {
+                        response = JSON.parse(message.data);
+                    } catch (error) {
+                        return;
+                    }
 
-                    const songTitle = res.song.title;
-                    const artistsFinal = !!sources ? `${artists} [${sources}]` : artists;
+                    switch (response.op) {
+                        case 0:
+                            ws.send(JSON.stringify({ op: 9 }));
+                            heartbeat(response.d.heartbeat);
+                            break;
+                        case 1:
+                            if (response.t !== 'TRACK_UPDATE' && response.t !== 'TRACK_UPDATE_REQUEST' && response.t !== 'QUEUE_UPDATE' && response.t !== 'NOTIFICATION') {
+                                break;
+                            }
 
-                    document.body.querySelector('.aplayer-title').setAttribute('title', `${songTitle} ${artistsFinal}`);
+                            const res = response.d;
 
-                    const reload = () => {
-                        window.listenMoe.list.add({
-                            name: songTitle,
-                            artist: artistsFinal,
-                            url: audioUrl,
-                            cover: cover
-                        });
+                            const artists = res.song.artists.map(e => e.name).join(', ');
+                            const albums = res.song.albums;
+                            const cover = albums.length > 0 && albums[0].image !== null ? getCover(albums[0].image) : getBlankCover();
+                            const sources = res.song.sources.map(e => e.nameRomaji).join(', ');
 
-                        window.listenMoe.list.switch(1);
-                        window.listenMoe.list.remove(0);
-                    };
+                            const songTitle = res.song.title;
+                            const artistsFinal = !!sources ? `${artists} [${sources}]` : artists;
 
-                    reload();
+                            document.body.querySelector('.aplayer-title').setAttribute('title', `${songTitle} ${artistsFinal}`);
 
-                    window.listenMoe.on('pause', () => {
-                        // This way the seek is always synced with the API
-                        reload();
-                    });
+                            const reload = () => {
+                                window.listenMoe.list.add({
+                                    name: songTitle,
+                                    artist: artistsFinal,
+                                    url: audioUrl,
+                                    cover: cover
+                                });
 
-                    break;
-                default:
-                    break;
-            }
-        };
+                                window.listenMoe.list.switch(1);
+                                window.listenMoe.list.remove(0);
+                            };
 
-        ws.onclose = () => {
-            clearInterval(heartbeatInterval);
-            heartbeatInterval = null;
+                            reload();
 
-            if (ws) {
-                ws.close();
-                ws = null;
-            }
+                            window.listenMoe.on('pause', () => {
+                                // This way the seek is always synced with the API
+                                reload();
+                            });
 
-            setTimeout(() => connect(), 5000);
-        };
+                            break;
+                        default:
+                            break;
+                    }
+                };
 
-        resolve();
-    });
+                ws.onclose = () => {
+                    clearInterval(heartbeatInterval);
+                    heartbeatInterval = null;
+
+                    if (ws) {
+                        ws.close();
+                        ws = null;
+                    }
+
+                    setTimeout(() => {
+                        console.log('reconnecting API...');
+                        listenMoe();
+                    }, 5000);
+                };
+            };
+
+            listenMoe();
+
+            resolve();
+        })
+    };
 
     extend(ForumApplication.prototype, 'mount', function () {
         const allowGuests = app.forum.attribute('listenMoeRadioGuests');
