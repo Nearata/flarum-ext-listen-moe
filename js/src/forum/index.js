@@ -16,6 +16,14 @@ const addResources = async () => {
 app.initializers.add('nearata-listen-moe', app => {
     const listenMoeUrl = 'https://listen.moe/stream';
 
+    const getCover = fileName => {
+        return `https://cdn.listen.moe/covers/${fileName}`;
+    };
+
+    const getBlankCover = () => {
+        return 'https://listen.moe/_nuxt/img/blank-dark.cd1c044.png';
+    };
+
     const wsPromise = () => new Promise(resolve => {
         let heartbeatInterval;
         let ws;
@@ -62,17 +70,32 @@ app.initializers.add('nearata-listen-moe', app => {
 
                     const artists = res.song.artists.map(e => e.name).join(', ');
                     const albums = res.song.albums;
-                    const cover = albums.length > 0 && albums[0].image !== null ? `https://cdn.listen.moe/covers/${albums[0].image}` : 'https://listen.moe/_nuxt/img/blank-dark.cd1c044.png';
+                    const cover = albums.length > 0 && albums[0].image !== null ? getCover(albums[0].image) : getBlankCover();
+                    const sources = res.song.sources.map(e => e.nameRomaji).join(', ');
 
-                    window.listenMoe.list.add({
-                        name: res.song.title,
-                        artist: artists,
-                        url: listenMoeUrl,
-                        cover: cover
+                    const songTitle = res.song.title;
+                    const artistsFinal = !!sources ? `${artists} [${sources}]` : artists;
+
+                    document.body.querySelector('.aplayer-title').setAttribute('title', `${songTitle} ${artistsFinal}`);
+
+                    const reload = () => {
+                        window.listenMoe.list.add({
+                            name: songTitle,
+                            artist: artistsFinal,
+                            url: listenMoeUrl,
+                            cover: cover
+                        });
+
+                        window.listenMoe.list.switch(1);
+                        window.listenMoe.list.remove(0);
+                    };
+
+                    reload();
+
+                    window.listenMoe.on('pause', () => {
+                        // This way the seek is always synced with the API
+                        reload();
                     });
-
-                    window.listenMoe.list.switch(1);
-                    window.listenMoe.list.remove(0);
 
                     break;
                 default:
@@ -110,8 +133,8 @@ app.initializers.add('nearata-listen-moe', app => {
                 preload: 'metadata',
                 volume: 0.5,
                 audio: {
-                    name: '',
-                    artist: '',
+                    name: '&nbsp;',
+                    artist: '&nbsp;',
                     url: listenMoeUrl
                 }
             });
