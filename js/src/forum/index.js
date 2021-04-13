@@ -1,3 +1,9 @@
+import { extend } from 'flarum/common/extend';
+import FieldSet from 'flarum/common/components/FieldSet';
+import Select from 'flarum/common/components/Select';
+import ForumApplication from 'flarum/forum/ForumApplication';
+import SettingsPage from 'flarum/forum/components/SettingsPage';
+
 import load from 'external-load';
 
 
@@ -14,7 +20,16 @@ const addResources = async () => {
 };
 
 app.initializers.add('nearata-listen-moe', app => {
-    const listenMoeUrl = 'https://listen.moe/stream';
+    const radio = {
+        'jpop': {
+            'audioUrl': 'https://listen.moe/stream',
+            'wsUrl': 'wss://listen.moe/gateway_v2'
+        },
+        'kpop': {
+            'audioUrl': 'https://listen.moe/kpop/stream',
+            'wsUrl': 'wss://listen.moe/kpop/gateway_v2'
+        }
+    }
 
     const getCover = fileName => {
         return `https://cdn.listen.moe/covers/${fileName}`;
@@ -24,17 +39,17 @@ app.initializers.add('nearata-listen-moe', app => {
         return 'https://listen.moe/_nuxt/img/blank-dark.cd1c044.png';
     };
 
-    const wsPromise = () => new Promise(resolve => {
+    const wsPromise = (audioUrl, wsUrl) => new Promise(resolve => {
         let heartbeatInterval;
         let ws;
 
-        function heartbeat(interval) {
+        const heartbeat = interval => {
             heartbeatInterval = setInterval(() => {
                 ws.send(JSON.stringify({ op: 9 }));
             }, interval);
         }
 
-        ws = new WebSocket('wss://listen.moe/gateway_v2');
+        ws = new WebSocket(wsUrl);
 
         ws.onopen = () => {
             clearInterval(heartbeatInterval);
@@ -82,7 +97,7 @@ app.initializers.add('nearata-listen-moe', app => {
                         window.listenMoe.list.add({
                             name: songTitle,
                             artist: artistsFinal,
-                            url: listenMoeUrl,
+                            url: audioUrl,
                             cover: cover
                         });
 
@@ -118,26 +133,66 @@ app.initializers.add('nearata-listen-moe', app => {
         resolve();
     });
 
-    addResources().then(() => {
-        const container = document.createElement('div');
-        container.id = 'nearata-listen-moe';
+    extend(ForumApplication.prototype, 'mount', function () {
+        const allowGuests = app.forum.attribute('listenMoeRadioGuests');
+        const user = app.session.user;
 
-        document.body.prepend(container);
+        if (!user && !allowGuests) {
+            return;
+        }
 
-        wsPromise().then(() => {
-            window.listenMoe = new APlayer({
-                container: container,
-                fixed: true,
-                theme: '#FF015B',
-                loop: 'none',
-                preload: 'metadata',
-                volume: 0.5,
-                audio: {
-                    name: '&nbsp;',
-                    artist: '&nbsp;',
-                    url: listenMoeUrl
-                }
+        const key = !!user ? user.preferences().listenMoeRadioType : app.forum.attribute('listenMoeRadioType');
+        const audioUrl = radio[key]['audioUrl'];
+        const wsUrl = radio[key]['wsUrl'];
+
+        addResources().then(() => {
+            const container = document.createElement('div');
+            container.id = 'nearata-listen-moe';
+
+            document.body.prepend(container);
+
+            wsPromise(audioUrl, wsUrl).then(() => {
+                window.listenMoe = new APlayer({
+                    container: container,
+                    fixed: true,
+                    theme: '#FF015B',
+                    loop: 'none',
+                    preload: 'metadata',
+                    volume: 0.5,
+                    audio: {
+                        name: '&nbsp;',
+                        artist: '&nbsp;',
+                        url: audioUrl
+                    }
+                });
             });
         });
+    });
+
+    extend(SettingsPage.prototype, 'settingsItems', function (items) {
+        const user = app.session.user;
+        const currentRadio = user.preferences().listenMoeRadioType;
+
+        items.add(
+            'listenMoeRadioType',
+            m(FieldSet, {
+                label: app.translator.trans('nearata-listen-moe.forum.settings.radio_label'),
+                class: 'Settings-theme'
+            }, [
+                m(Select, {
+                    class: 'Settings-theme--input',
+                    value: currentRadio,
+                    options: {
+                        'jpop': app.translator.trans('nearata-listen-moe.forum.settings.radio_options.jpop'),
+                        'kpop': app.translator.trans('nearata-listen-moe.forum.settings.radio_options.kpop')
+                    },
+                    onchange: value => {
+                        user.savePreferences({
+                            listenMoeRadioType: value
+                        }).then(() => location.reload());
+                    }
+                })
+            ])
+        );
     });
 });
