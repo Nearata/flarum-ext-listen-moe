@@ -81,8 +81,6 @@ app.initializers.add('nearata-listen-moe', app => {
 
                     const res = response.d;
 
-                    console.log(res);
-
                     const artists = res.song.artists.map(e => e.name).join(', ');
                     const albums = res.song.albums;
                     const cover = albums.length > 0 && albums[0].image !== null ? getCover(albums[0].image) : getBlankCover();
