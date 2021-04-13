@@ -1,6 +1,6 @@
 # Listen Moe
 
-> A [Flarum](http://flarum.org) extension. LISTEN.moe - J-pop, K-pop, and anime music radio.
+> A [Flarum](http://flarum.org) extension. [LISTEN.moe](https://listen.moe) - J-pop, K-pop, and anime music radio.
 
 ## Preview
 
