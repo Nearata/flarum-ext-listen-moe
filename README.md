@@ -2,6 +2,10 @@
 
 > A [Flarum](http://flarum.org) extension. LISTEN.moe - J-pop, K-pop, and anime music radio.
 
+## Preview
+
+- [Images](https://imgur.com/a/gvqovxU)
+
 ## Install
 
 ```sh
