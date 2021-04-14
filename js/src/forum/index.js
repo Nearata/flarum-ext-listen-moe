@@ -77,7 +77,9 @@ app.initializers.add('nearata-listen-moe', app => {
                             heartbeat(response.d.heartbeat);
                             break;
                         case 1:
-                            if (response.t !== 'TRACK_UPDATE' && response.t !== 'TRACK_UPDATE_REQUEST' && response.t !== 'QUEUE_UPDATE' && response.t !== 'NOTIFICATION') {
+                            const valids = ['TRACK_UPDATE', 'TRACK_UPDATE_REQUEST', 'QUEUE_UPDATE', 'NOTIFICATION'];
+
+                            if (valids.indexOf(response.t) === -1) {
                                 break;
                             }
 
