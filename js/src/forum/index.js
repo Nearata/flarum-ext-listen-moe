@@ -41,90 +41,88 @@ const getBlankCover = () => {
 };
 
 const websocket = (audioUrl, wsUrl) => {
-    return new Promise(resolve => {
-        let heartbeatInterval;
+    let heartbeatInterval;
 
-        const heartbeat = interval => {
-            heartbeatInterval = setInterval(() => {
-                ws.send(JSON.stringify({ op: 9 }));
-            }, interval);
+    const heartbeat = interval => {
+        heartbeatInterval = setInterval(() => {
+            app.listenMoe.websocket.send(JSON.stringify({ op: 9 }));
+        }, interval);
+    }
+
+    app.listenMoe.websocket = new ReconnectingWebSocket(wsUrl, [], { connectionTimeout: 5000 });
+
+    app.listenMoe.websocket.onopen = () => {
+        clearInterval(heartbeatInterval);
+        heartbeatInterval = null;
+    };
+
+    app.listenMoe.websocket.onmessage = message => {
+        if (!message.data.length) {
+            return;
         }
 
-        const ws = new ReconnectingWebSocket(wsUrl, [], { connectionTimeout: 5000 });
+        let response;
 
-        ws.onopen = () => {
-            clearInterval(heartbeatInterval);
-            heartbeatInterval = null;
-        };
+        try {
+            response = JSON.parse(message.data);
+        } catch (error) {
+            return;
+        }
 
-        ws.onmessage = message => {
-            if (!message.data.length) {
+        if (response.op === 0) {
+            app.listenMoe.websocket.send(JSON.stringify({ op: 9 }));
+            heartbeat(response.d.heartbeat);
+        }
+
+        if (response.op === 1) {
+            const valids = ['TRACK_UPDATE', 'TRACK_UPDATE_REQUEST', 'QUEUE_UPDATE', 'NOTIFICATION'];
+
+            if (valids.indexOf(response.t) === -1) {
                 return;
             }
 
-            let response;
+            const res = response.d;
 
-            try {
-                response = JSON.parse(message.data);
-            } catch (error) {
-                return;
-            }
+            const artists = res.song.artists.map(e => e.name).join(', ');
+            const albums = res.song.albums;
+            const cover = albums.length > 0 && albums[0].image !== null ? getCover(albums[0].image) : getBlankCover();
+            const sources = res.song.sources.map(e => e.nameRomaji).join(', ');
 
-            if (response.op === 0) {
-                ws.send(JSON.stringify({ op: 9 }));
-                heartbeat(response.d.heartbeat);
-            }
+            const songTitle = res.song.title;
+            const artistsFinal = !!sources ? `${artists} [${sources}]` : artists;
 
-            if (response.op === 1) {
-                const valids = ['TRACK_UPDATE', 'TRACK_UPDATE_REQUEST', 'QUEUE_UPDATE', 'NOTIFICATION'];
+            document.body.querySelector('.aplayer-title').setAttribute('title', `${songTitle} ${artistsFinal}`);
 
-                if (valids.indexOf(response.t) === -1) {
-                    return;
-                }
-
-                const res = response.d;
-
-                const artists = res.song.artists.map(e => e.name).join(', ');
-                const albums = res.song.albums;
-                const cover = albums.length > 0 && albums[0].image !== null ? getCover(albums[0].image) : getBlankCover();
-                const sources = res.song.sources.map(e => e.nameRomaji).join(', ');
-
-                const songTitle = res.song.title;
-                const artistsFinal = !!sources ? `${artists} [${sources}]` : artists;
-
-                document.body.querySelector('.aplayer-title').setAttribute('title', `${songTitle} ${artistsFinal}`);
-
-                const reload = () => {
-                    window.listenMoe.list.add({
-                        name: songTitle,
-                        artist: artistsFinal,
-                        url: audioUrl,
-                        cover: cover
-                    });
-
-                    window.listenMoe.list.switch(1);
-                    window.listenMoe.list.remove(0);
-                };
-
-                reload();
-
-                window.listenMoe.on('pause', () => {
-                    // This way the seek is always synced with the API
-                    reload();
+            const reload = () => {
+                app.listenMoe.player.list.add({
+                    name: songTitle,
+                    artist: artistsFinal,
+                    url: audioUrl,
+                    cover: cover
                 });
-            }
-        };
 
-        ws.onclose = () => {
-            clearInterval(heartbeatInterval);
-            heartbeatInterval = null;
-        };
+                app.listenMoe.player.list.switch(1);
+                app.listenMoe.player.list.remove(0);
+            };
 
-        return resolve(ws);
-    });
+            reload();
+
+            app.listenMoe.player.on('pause', () => {
+                // This way the seek is always synced with the API
+                reload();
+            });
+        }
+    };
+
+    app.listenMoe.websocket.onclose = () => {
+        clearInterval(heartbeatInterval);
+        heartbeatInterval = null;
+    };
 };
 
 app.initializers.add('nearata-listen-moe', app => {
+    app.listenMoe = {};
+
     extend(ForumApplication.prototype, 'mount', function () {
         const allowGuests = app.forum.attribute('listenMoeRadioGuests');
         const user = app.session.user;
@@ -143,21 +141,21 @@ app.initializers.add('nearata-listen-moe', app => {
 
             document.body.prepend(container);
 
-            websocket(audioUrl, wsUrl).then(() => {
-                window.listenMoe = new APlayer({
-                    container: container,
-                    fixed: true,
-                    theme: '#FF015B',
-                    loop: 'none',
-                    preload: 'metadata',
-                    volume: 0.5,
-                    audio: {
-                        name: '&nbsp;',
-                        artist: '&nbsp;',
-                        url: audioUrl
-                    }
-                });
+            app.listenMoe.player = new APlayer({
+                container: container,
+                fixed: true,
+                theme: '#FF015B',
+                loop: 'none',
+                preload: 'metadata',
+                volume: 0.5,
+                audio: {
+                    name: '&nbsp;',
+                    artist: '&nbsp;',
+                    url: audioUrl
+                }
             });
+
+            websocket(audioUrl, wsUrl);
         });
     });
 
