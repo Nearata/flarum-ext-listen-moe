@@ -5,6 +5,7 @@ import ForumApplication from 'flarum/forum/ForumApplication';
 import SettingsPage from 'flarum/forum/components/SettingsPage';
 
 import load from 'external-load';
+import ReconnectingWebSocket from 'reconnecting-websocket';
 
 
 let resLoaded = false;
@@ -19,129 +20,111 @@ const addResources = async () => {
     resLoaded = true;
 };
 
-app.initializers.add('nearata-listen-moe', app => {
-    const radio = {
-        'jpop': {
-            'audioUrl': 'https://listen.moe/stream',
-            'wsUrl': 'wss://listen.moe/gateway_v2'
-        },
-        'kpop': {
-            'audioUrl': 'https://listen.moe/kpop/stream',
-            'wsUrl': 'wss://listen.moe/kpop/gateway_v2'
-        }
+const radio = {
+    'jpop': {
+        'audioUrl': 'https://listen.moe/stream',
+        'wsUrl': 'wss://listen.moe/gateway_v2'
+    },
+    'kpop': {
+        'audioUrl': 'https://listen.moe/kpop/stream',
+        'wsUrl': 'wss://listen.moe/kpop/gateway_v2'
     }
+}
 
-    const getCover = fileName => {
-        return `https://cdn.listen.moe/covers/${fileName}`;
-    };
+const getCover = fileName => {
+    return `https://cdn.listen.moe/covers/${fileName}`;
+};
 
-    const getBlankCover = () => {
-        return 'https://listen.moe/_nuxt/img/blank-dark.cd1c044.png';
-    };
+const getBlankCover = () => {
+    const baseUrl = app.forum.attribute('baseUrl');
+    return `${baseUrl}/assets/extensions/nearata-listen-moe/blank-dark.png`;
+};
 
-    const wsPromise = (audioUrl, wsUrl) => {
-        return new Promise(resolve => {
-            const listenMoe = () => {
-                let heartbeatInterval;
-                let ws;
+const websocket = (audioUrl, wsUrl) => {
+    return new Promise(resolve => {
+        let heartbeatInterval;
 
-                const heartbeat = interval => {
-                    heartbeatInterval = setInterval(() => {
-                        ws.send(JSON.stringify({ op: 9 }));
-                    }, interval);
+        const heartbeat = interval => {
+            heartbeatInterval = setInterval(() => {
+                ws.send(JSON.stringify({ op: 9 }));
+            }, interval);
+        }
+
+        const ws = new ReconnectingWebSocket(wsUrl, [], { connectionTimeout: 5000 });
+
+        ws.onopen = () => {
+            clearInterval(heartbeatInterval);
+            heartbeatInterval = null;
+        };
+
+        ws.onmessage = message => {
+            if (!message.data.length) {
+                return;
+            }
+
+            let response;
+
+            try {
+                response = JSON.parse(message.data);
+            } catch (error) {
+                return;
+            }
+
+            if (response.op === 0) {
+                ws.send(JSON.stringify({ op: 9 }));
+                heartbeat(response.d.heartbeat);
+            }
+
+            if (response.op === 1) {
+                const valids = ['TRACK_UPDATE', 'TRACK_UPDATE_REQUEST', 'QUEUE_UPDATE', 'NOTIFICATION'];
+
+                if (valids.indexOf(response.t) === -1) {
+                    return;
                 }
 
-                ws = new WebSocket(wsUrl);
+                const res = response.d;
 
-                ws.onopen = () => {
-                    clearInterval(heartbeatInterval);
-                    heartbeatInterval = null;
+                const artists = res.song.artists.map(e => e.name).join(', ');
+                const albums = res.song.albums;
+                const cover = albums.length > 0 && albums[0].image !== null ? getCover(albums[0].image) : getBlankCover();
+                const sources = res.song.sources.map(e => e.nameRomaji).join(', ');
+
+                const songTitle = res.song.title;
+                const artistsFinal = !!sources ? `${artists} [${sources}]` : artists;
+
+                document.body.querySelector('.aplayer-title').setAttribute('title', `${songTitle} ${artistsFinal}`);
+
+                const reload = () => {
+                    window.listenMoe.list.add({
+                        name: songTitle,
+                        artist: artistsFinal,
+                        url: audioUrl,
+                        cover: cover
+                    });
+
+                    window.listenMoe.list.switch(1);
+                    window.listenMoe.list.remove(0);
                 };
 
-                ws.onmessage = message => {
-                    if (!message.data.length) {
-                        return;
-                    }
+                reload();
 
-                    let response;
+                window.listenMoe.on('pause', () => {
+                    // This way the seek is always synced with the API
+                    reload();
+                });
+            }
+        };
 
-                    try {
-                        response = JSON.parse(message.data);
-                    } catch (error) {
-                        return;
-                    }
+        ws.onclose = () => {
+            clearInterval(heartbeatInterval);
+            heartbeatInterval = null;
+        };
 
-                    switch (response.op) {
-                        case 0:
-                            ws.send(JSON.stringify({ op: 9 }));
-                            heartbeat(response.d.heartbeat);
-                            break;
-                        case 1:
-                            const valids = ['TRACK_UPDATE', 'TRACK_UPDATE_REQUEST', 'QUEUE_UPDATE', 'NOTIFICATION'];
+        return resolve(ws);
+    });
+};
 
-                            if (valids.indexOf(response.t) === -1) {
-                                break;
-                            }
-
-                            const res = response.d;
-
-                            const artists = res.song.artists.map(e => e.name).join(', ');
-                            const albums = res.song.albums;
-                            const cover = albums.length > 0 && albums[0].image !== null ? getCover(albums[0].image) : getBlankCover();
-                            const sources = res.song.sources.map(e => e.nameRomaji).join(', ');
-
-                            const songTitle = res.song.title;
-                            const artistsFinal = !!sources ? `${artists} [${sources}]` : artists;
-
-                            document.body.querySelector('.aplayer-title').setAttribute('title', `${songTitle} ${artistsFinal}`);
-
-                            const reload = () => {
-                                window.listenMoe.list.add({
-                                    name: songTitle,
-                                    artist: artistsFinal,
-                                    url: audioUrl,
-                                    cover: cover
-                                });
-
-                                window.listenMoe.list.switch(1);
-                                window.listenMoe.list.remove(0);
-                            };
-
-                            reload();
-
-                            window.listenMoe.on('pause', () => {
-                                // This way the seek is always synced with the API
-                                reload();
-                            });
-
-                            break;
-                        default:
-                            break;
-                    }
-                };
-
-                ws.onclose = () => {
-                    clearInterval(heartbeatInterval);
-                    heartbeatInterval = null;
-
-                    if (ws) {
-                        ws.close();
-                        ws = null;
-                    }
-
-                    setTimeout(() => {
-                        console.log('reconnecting API...');
-                        listenMoe();
-                    }, 5000);
-                };
-            };
-
-            listenMoe();
-
-            resolve();
-        })
-    };
-
+app.initializers.add('nearata-listen-moe', app => {
     extend(ForumApplication.prototype, 'mount', function () {
         const allowGuests = app.forum.attribute('listenMoeRadioGuests');
         const user = app.session.user;
@@ -160,7 +143,7 @@ app.initializers.add('nearata-listen-moe', app => {
 
             document.body.prepend(container);
 
-            wsPromise(audioUrl, wsUrl).then(() => {
+            websocket(audioUrl, wsUrl).then(() => {
                 window.listenMoe = new APlayer({
                     container: container,
                     fixed: true,
