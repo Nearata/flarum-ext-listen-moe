@@ -1,5 +1,7 @@
 # Listen Moe
 
+![latest](https://flarum-badge-api.davwheat.dev/v1/compat-latest/nearata/flarum-ext-listen-moe)
+
 > A [Flarum](http://flarum.org) extension. [LISTEN.moe](https://listen.moe) - J-pop, K-pop, and anime music radio.
 
 ## Preview
