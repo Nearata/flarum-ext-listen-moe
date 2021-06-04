@@ -1,4 +1,5 @@
 import { extend } from 'flarum/common/extend';
+import app from 'flarum/forum/app';
 import FieldSet from 'flarum/common/components/FieldSet';
 import Select from 'flarum/common/components/Select';
 import ForumApplication from 'flarum/forum/ForumApplication';
@@ -33,11 +34,6 @@ const radio = {
 
 const getCover = fileName => {
     return `https://cdn.listen.moe/covers/${fileName}`;
-};
-
-const getBlankCover = () => {
-    const baseUrl = app.forum.attribute('baseUrl');
-    return `${baseUrl}/assets/extensions/nearata-listen-moe/blank-dark.png`;
 };
 
 const websocket = (audioUrl, wsUrl) => {
@@ -85,7 +81,7 @@ const websocket = (audioUrl, wsUrl) => {
 
             const artists = res.song.artists.map(e => e.name).join(', ');
             const albums = res.song.albums;
-            const cover = albums.length > 0 && albums[0].image !== null ? getCover(albums[0].image) : getBlankCover();
+            const cover = albums.length > 0 && albums[0].image !== null ? getCover(albums[0].image) : app.forum.attribute('blankUrl');
             const sources = res.song.sources.map(e => e.nameRomaji).join(', ');
 
             const songTitle = res.song.title;
@@ -120,7 +116,7 @@ const websocket = (audioUrl, wsUrl) => {
     };
 };
 
-app.initializers.add('nearata-listen-moe', app => {
+app.initializers.add('nearata-listen-moe', () => {
     app.listenMoe = {};
 
     extend(ForumApplication.prototype, 'mount', function () {
