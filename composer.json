@@ -10,7 +10,7 @@
         "radio"
     ],
     "type": "flarum-extension",
-    "license": "MIT",
+    "license": "Unlicense",
     "support": {
         "issues": "https://github.com/Nearata/flarum-ext-listen-moe/issues",
         "source": "https://github.com/Nearata/flarum-ext-listen-moe"
@@ -21,7 +21,7 @@
     "authors": [
         {
             "name": "Nearata",
-            "email": "williamdicicco@protonmail.com",
+            "email": "nearata@protonmail.com",
             "role": "Developer"
         }
     ],
