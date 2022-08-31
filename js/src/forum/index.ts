@@ -7,20 +7,21 @@ import app from "flarum/forum/app";
 import SettingsPage from "flarum/forum/components/SettingsPage";
 import ReconnectingWebSocket from "reconnecting-websocket";
 
-let resLoaded = false;
+let loaded = false;
 const addResources = async () => {
-    if (resLoaded) {
+    if (loaded) {
         return;
     }
 
     await load.css(
         "https://cdnjs.cloudflare.com/ajax/libs/aplayer/1.10.1/APlayer.min.css"
     );
+
     await load.js(
         "https://cdnjs.cloudflare.com/ajax/libs/aplayer/1.10.1/APlayer.min.js"
     );
 
-    resLoaded = true;
+    loaded = true;
 };
 
 const radio = {
@@ -34,11 +35,11 @@ const radio = {
     },
 };
 
-const getCover = (fileName) => {
+const getCover = (fileName: string) => {
     return `https://cdn.listen.moe/covers/${fileName}`;
 };
 
-const websocket = (audioUrl, wsUrl) => {
+const websocket = (audioUrl: string, wsUrl) => {
     let heartbeatInterval;
 
     const heartbeat = (interval) => {
@@ -201,7 +202,7 @@ app.initializers.add("nearata-listen-moe", () => {
                                 "nearata-listen-moe.forum.settings.radio_options.kpop"
                             ),
                         },
-                        onchange: (value) => {
+                        onchange: (value: string) => {
                             user.savePreferences({
                                 listenMoeRadioType: value,
                             }).then(() => location.reload());
