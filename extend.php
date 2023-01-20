@@ -19,5 +19,9 @@ return [
         ->registerPreference('listenMoeRadioType', 'strval', 'jpop'),
 
     (new Extend\ApiSerializer(ForumSerializer::class))
-        ->attributes(ForumSettings::class)
+        ->attributes(ForumSettings::class),
+
+    (new Extend\Settings)
+        ->default('nearata-listen-moe.admin.guests', false)
+        ->default('nearata-listen-moe.admin.radio_type', 'jpop'),
 ];

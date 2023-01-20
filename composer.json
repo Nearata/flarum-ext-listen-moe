@@ -16,7 +16,7 @@
         "source": "https://github.com/Nearata/flarum-ext-listen-moe"
     },
     "require": {
-        "flarum/core": "^1.0.0"
+        "flarum/core": "^1.6.0"
     },
     "authors": [
         {
